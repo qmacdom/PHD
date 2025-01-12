@@ -54,6 +54,34 @@ osoby_df['PrzejscieKlucz'] = osoby_df['Przejście'] + osoby_df[
 cudzoziemcy_df['PrzejscieKlucz'] = cudzoziemcy_df['Przejście'] + \
                                    cudzoziemcy_df['Rodzaj przejścia']
 
+
+
+# Zbiór unikalnych kodów obywatelstwa z cudzoziemców
+unique_citizenships = cudzoziemcy_df[["Obywatelstwo (kod)", "Obywatelstwo (nazwa)"]].drop_duplicates()
+
+# Dodanie wiersza dla Polski
+polska_row = pd.DataFrame([{"Obywatelstwo (kod)": "PL", "Obywatelstwo (nazwa)": "Polska"}])
+unique_citizenships = pd.concat([unique_citizenships, polska_row], ignore_index=True)
+
+# Możliwe grupy wiekowe i płcie
+age_groups = ['0-10', '10-17', '18-27', '28-40', '41-65', '65-102']
+genders = ['M', 'F']
+
+# Generowanie kombinacji Osoba
+for _, citizenship_row in unique_citizenships.iterrows():
+    for gender in genders:
+        for age_group in age_groups:
+            querry = (
+                f"INSERT INTO Osoba (Kl_osoba, kod_obywatelstwa, obywatelstwo, grupa_wiekowa, plec) "
+                f"VALUES ('{citizenship_row['Obywatelstwo (kod)'] + gender + age_group}', '{citizenship_row['Obywatelstwo (kod)']}', '{citizenship_row['Obywatelstwo (nazwa)']}', '{age_group}', '{gender}');"
+            )
+            insert_queries.add(querry)
+
+
+
+
+
+
 # Tabela Fakt_Przekroczenie_granicy
 for _, osoba_row in osoby_df.iterrows():
     if osoba_row['Kto'] == 'C':
@@ -63,19 +91,25 @@ for _, osoba_row in osoby_df.iterrows():
             (cudzoziemcy_df["Kierunek"] == osoba_row["Kierunek"]) &
             (cudzoziemcy_df["PrzejscieKlucz"] == osoba_row["PrzejscieKlucz"])]
         if not matches.empty:
-
             non_zero_columns = []
-            for col_name, value in osoba_row.items():
-                if col_name not in ["Placówka SG", "Przejście",
-                                    "Rodzaj przejścia",
-                                    "Odcinek", "Oddział SG", "Data", "Kto",
-                                    "Kierunek", "Razem"]:
-                    try:
-                        numeric_value = int(value)
-                        if numeric_value > 0:
-                            non_zero_columns.append((col_name, numeric_value))
-                    except ValueError:
-                        continue
+            for col_name in ["Paszportowy", "Pozasystemowa", "MRG", "Inny",
+                             "Załogi pociągów osobowych",
+                             "Załogi pociągów towarowych",
+                             "Załogi statków pasażerskich",
+                             "Załogi statków handlowych",
+                             "Załogi statków rybackich", "Załogi kutrów",
+                             "Załogi taboru rzecznego",
+                             "Załogi jednostek sportowo-żeglarskich",
+                             "Załogi samolotów", "Załogi śmigłowców",
+                             "os. w INNYCH"
+                             ]:
+                try:
+                    value = int(osoba_row[col_name])
+                    numeric_value = int(value)
+                    if numeric_value > 0:
+                        non_zero_columns.append((col_name, numeric_value))
+                except ValueError:
+                    continue
             narodowosci = [(row['Obywatelstwo (kod)'], row['Razem']) for
                            _, row in matches.iterrows()]
 
@@ -127,8 +161,8 @@ for _, osoba_row in osoby_df.iterrows():
                          "Załogi statków handlowych",
                          "Załogi statków rybackich", "Załogi kutrów",
                          "Załogi taboru rzecznego",
-                         "Załogi jednostek sportowo - żeglarskich",
-                         "Załogi samolotów", "Załogi śmigłowców", "os.w INNYCH"
+                         "Załogi jednostek sportowo-żeglarskich",
+                         "Załogi samolotów", "Załogi śmigłowców", "os. w INNYCH"
                          ]:
             try:
                 value = int(osoba_row[col_name])
@@ -192,27 +226,6 @@ for _, row in unique_crossings.iterrows():
 #             except Exception as e:
 #                 continue
 
-
-# Zbiór unikalnych kodów obywatelstwa z cudzoziemców
-unique_citizenships = cudzoziemcy_df[["Obywatelstwo (kod)", "Obywatelstwo (nazwa)"]].drop_duplicates()
-
-# Dodanie wiersza dla Polski
-polska_row = pd.DataFrame([{"Obywatelstwo (kod)": "PL", "Obywatelstwo (nazwa)": "Polska"}])
-unique_citizenships = pd.concat([unique_citizenships, polska_row], ignore_index=True)
-
-# Możliwe grupy wiekowe i płcie
-age_groups = ['0-10', '10-17', '18-27', '28-40', '41-65', '65-102']
-genders = ['M', 'F']
-
-# Generowanie kombinacji Osoba
-for _, citizenship_row in unique_citizenships.iterrows():
-    for gender in genders:
-        for age_group in age_groups:
-            querry = (
-                f"INSERT INTO Osoba (Kl_osoba, kod_obywatelstwa, obywatelstwo, grupa_wiekowa, plec) "
-                f"VALUES ('{citizenship_row['Obywatelstwo (kod)'] + gender + age_group}', '{citizenship_row['Obywatelstwo (kod)']}', '{citizenship_row['Obywatelstwo (nazwa)']}', '{age_group}', '{gender}');"
-            )
-            insert_queries.add(querry)
 
 # Zapisz zapytania do pliku
 output_file = "output_script.sql"
